@@ -7,7 +7,6 @@ require (
 	github.com/desmos-labs/cosmos-go-wallet v0.7.2
 	github.com/desmos-labs/desmos/v6 v6.2.0
 	github.com/joho/godotenv v1.5.1
-	github.com/panjf2000/ants/v2 v2.8.2
 	github.com/rs/zerolog v1.30.0
 )
 
