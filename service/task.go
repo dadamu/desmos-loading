@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -13,7 +12,6 @@ import (
 )
 
 type Service struct {
-	mu     sync.Mutex
 	wallet *wallet.Wallet
 
 	size       int
@@ -40,6 +38,9 @@ func NewService(cfg *Config) Service {
 	}
 
 	sequence, err := GetAccountSequence(cdc, walletClient.AuthClient, wallet.AccAddress())
+	if err != nil {
+		panic(fmt.Errorf("error while getting wallet account sequence: %s", err))
+	}
 
 	return Service{
 		wallet: wallet,
@@ -55,7 +56,6 @@ func NewService(cfg *Config) Service {
 }
 
 func (s *Service) RunTasks() {
-	var wg sync.WaitGroup
 	ticker := time.NewTicker(time.Duration(s.duration.Nanoseconds() / int64(s.round)))
 
 	count := 0
@@ -64,31 +64,21 @@ func (s *Service) RunTasks() {
 			break
 		}
 
-		wg.Add(1)
-		go func() {
-			err := s.broadcast(generatePostMsgs(s.subspaceID, s.size, s.wallet.AccAddress()))
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			wg.Done()
-		}()
+		err := s.broadcast(generatePostMsgs(s.subspaceID, s.size, s.wallet.AccAddress()))
+		if err != nil {
+			fmt.Println(err)
+		}
 
 		count += 1
 	}
-	wg.Wait()
 }
 
 func (s *Service) broadcast(msgs []sdk.Msg) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// Build the transaction data
 	txData := wallettypes.NewTransactionData(msgs...).
 		WithGasLimit(s.gasLimit).
 		WithFeeAuto().
 		WithSequence(s.sequence)
-	s.sequence += 1
 
 	// Broadcast the transaction
 	response, err := s.wallet.BroadcastTxSync(txData)
@@ -102,5 +92,6 @@ func (s *Service) broadcast(msgs []sdk.Msg) error {
 		return fmt.Errorf("error while broadcasting msg: %s", response.RawLog)
 	}
 
+	s.sequence += 1
 	return nil
 }
