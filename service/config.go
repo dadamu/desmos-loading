@@ -7,6 +7,7 @@ import (
 	"time"
 
 	wallettypes "github.com/desmos-labs/cosmos-go-wallet/types"
+	"github.com/desmos-labs/desmos-loading/utils"
 	"github.com/desmos-labs/desmos/v6/app"
 	subspacetypes "github.com/desmos-labs/desmos/v6/x/subspaces/types"
 )
@@ -21,7 +22,6 @@ const (
 	EnvSize       = "MSG_SIZE"
 
 	EnvDuration = "DURATION"
-	EnvRound    = "ROUND"
 )
 
 type Config struct {
@@ -31,46 +31,39 @@ type Config struct {
 	Size       int
 
 	Duration time.Duration
-	Round    int
 }
 
 // ReadEnvConfig reads a Config instance from the env variables values
 func ReadEnvConfig() (*Config, error) {
-	subspaceID, err := subspacetypes.ParseSubspaceID(GetEnvOr(EnvSubspaceID, ""))
+	subspaceID, err := subspacetypes.ParseSubspaceID(utils.GetEnvOr(EnvSubspaceID, ""))
 	if err != nil {
 		return nil, err
 	}
 
-	size, err := strconv.Atoi(GetEnvOr(EnvSize, ""))
+	size, err := strconv.Atoi(utils.GetEnvOr(EnvSize, ""))
 	if err != nil {
 		return nil, err
 	}
 
-	round, err := strconv.Atoi(GetEnvOr(EnvRound, ""))
-	if err != nil {
-		return nil, err
-	}
-
-	duration, err := time.ParseDuration(GetEnvOr(EnvDuration, ""))
+	duration, err := time.ParseDuration(utils.GetEnvOr(EnvDuration, ""))
 	if err != nil {
 		return nil, err
 	}
 
 	cfg := &Config{
 		Account: &wallettypes.AccountConfig{
-			Mnemonic: GetEnvOr(EnvAccountRecoveryPhrase, ""),
+			Mnemonic: utils.GetEnvOr(EnvAccountRecoveryPhrase, ""),
 			HDPath:   app.FullFundraiserPath,
 		},
 		Chain: &wallettypes.ChainConfig{
 			Bech32Prefix:  app.Bech32MainPrefix,
-			RPCAddr:       GetEnvOr(EnvRPCAddress, ""),
-			GRPCAddr:      GetEnvOr(EnvGRPCAddress, ""),
-			GasPrice:      GetEnvOr(EnvGasPrice, "0.02udaric"),
+			RPCAddr:       utils.GetEnvOr(EnvRPCAddress, ""),
+			GRPCAddr:      utils.GetEnvOr(EnvGRPCAddress, ""),
+			GasPrice:      utils.GetEnvOr(EnvGasPrice, "0.02udaric"),
 			GasAdjustment: 2,
 		},
 		SubspaceID: subspaceID,
 		Size:       size,
-		Round:      round,
 		Duration:   duration,
 	}
 	return cfg, cfg.Validate()

@@ -1,29 +1,30 @@
 package service
 
 import (
+	"context"
 	"fmt"
+	"math"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/desmos-labs/cosmos-go-wallet/client"
 	wallettypes "github.com/desmos-labs/cosmos-go-wallet/types"
 	"github.com/desmos-labs/cosmos-go-wallet/wallet"
 	"github.com/desmos-labs/desmos/v6/app"
+	poststypes "github.com/desmos-labs/desmos/v6/x/posts/types"
 )
 
 type Service struct {
-	wallet *wallet.Wallet
+	Wallet *wallet.Wallet
 
 	size       int
 	subspaceID uint64
-	gasLimit   uint64
-	sequence   uint64
 
 	duration time.Duration
-	round    int
 }
 
-func NewService(cfg *Config) Service {
+func NewService(cfg *Config) *Service {
 	encodingCfg := app.MakeEncodingConfig()
 	txConfig, cdc := encodingCfg.TxConfig, encodingCfg.Codec
 
@@ -37,61 +38,131 @@ func NewService(cfg *Config) Service {
 		panic(fmt.Errorf("error while creating cosmos wallet: %s", err))
 	}
 
-	sequence, err := GetAccountSequence(cdc, walletClient.AuthClient, wallet.AccAddress())
-	if err != nil {
-		panic(fmt.Errorf("error while getting wallet account sequence: %s", err))
-	}
-
-	return Service{
-		wallet: wallet,
+	return &Service{
+		Wallet: wallet,
 
 		size:       cfg.Size,
 		subspaceID: cfg.SubspaceID,
-		gasLimit:   GetGasLimit(wallet, generatePostMsgs(cfg.SubspaceID, cfg.Size, wallet.AccAddress())),
-		sequence:   sequence,
 
-		round:    cfg.Round,
 		duration: cfg.Duration,
 	}
 }
 
-func (s *Service) RunTasks() {
-	ticker := time.NewTicker(time.Duration(s.duration.Nanoseconds() / int64(s.round)))
+func (s *Service) RunTasks(round int) {
+	fmt.Println(fmt.Sprintf("tester address: %s", s.Wallet.AccAddress()))
 
+	ticker := time.NewTicker(time.Millisecond * 100)
+	sequence, err := s.getSequence()
+	if err != nil {
+		panic(err)
+	}
+
+	msgs := s.generatePostMsgs(s.subspaceID, s.size, s.Wallet.AccAddress())
+	gas := s.getGasLimit(msgs)
+
+	roundPerTick := math.Floor(float64(round) / float64(s.duration.Milliseconds()) * 100)
 	count := 0
 	for range ticker.C {
-		if count >= s.round {
+		if count >= round {
 			break
 		}
 
-		err := s.broadcast(generatePostMsgs(s.subspaceID, s.size, s.wallet.AccAddress()))
-		if err != nil {
-			fmt.Println(err)
-		}
+		countPerTick := 0
+		for {
+			if countPerTick >= int(roundPerTick) {
+				break
+			}
 
-		count += 1
+			err := s.broadcast(msgs, sequence, gas)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			sequence += 1
+			countPerTick += 1
+			count += 1
+		}
 	}
 }
 
-func (s *Service) broadcast(msgs []sdk.Msg) error {
+func (s *Service) broadcast(msgs []sdk.Msg, sequence uint64, gasLimit uint64) error {
 	// Build the transaction data
 	txData := wallettypes.NewTransactionData(msgs...).
-		WithGasLimit(s.gasLimit).
 		WithFeeAuto().
-		WithSequence(s.sequence)
+		WithGasLimit(gasLimit).
+		WithSequence(sequence)
 
 	// Broadcast the transaction
-	response, err := s.wallet.BroadcastTxSync(txData)
-	fmt.Println(s.sequence, response.TxHash)
+	response, err := s.Wallet.BroadcastTxSync(txData)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	// Check the response
 	if response.Code != 0 {
-		return fmt.Errorf("error while broadcasting msg: %s", response.RawLog)
+		panic(fmt.Errorf("%s error while broadcasting msg: %s", s.Wallet.AccAddress(), response.RawLog))
 	}
 
-	s.sequence += 1
 	return nil
+}
+
+func (s *Service) getGasLimit(msgs []sdk.Msg) uint64 {
+	// Build the transaction data for simulation
+	txData := wallettypes.NewTransactionData(msgs...).
+		WithGasAuto().
+		WithFeeAuto()
+
+	builder, err := s.Wallet.BuildTx(txData)
+	if err != nil {
+		panic(err)
+	}
+
+	gasLimit, err := s.Wallet.Client.SimulateTx(builder.GetTx())
+	if err != nil {
+		panic(err)
+	}
+
+	return gasLimit
+}
+
+func (s *Service) getSequence() (uint64, error) {
+	res, err := s.Wallet.Client.AuthClient.Account(context.Background(), &authtypes.QueryAccountRequest{Address: s.Wallet.AccAddress()})
+	if err != nil {
+		return 0, fmt.Errorf("error while getting account from node")
+	}
+
+	err = res.UnpackInterfaces(s.Wallet.Client.Codec)
+	if err != nil {
+		return 0, fmt.Errorf("error while unpacking response")
+	}
+
+	account, ok := res.Account.GetCachedValue().(authtypes.AccountI)
+	if !ok {
+		return 0, fmt.Errorf("error while get account from cached value")
+	}
+
+	return account.GetSequence(), nil
+}
+
+func (s *Service) generatePostMsgs(subspaceID uint64, size int, author string) []sdk.Msg {
+	msgs := make([]sdk.Msg, size)
+
+	for i := 0; i < size; i++ {
+		msgs[i] = poststypes.NewMsgCreatePost(
+			subspaceID,
+			0,
+			"",
+			"Lorem ipsum dolor sit amet, id veri scriptorem mei, in pri meliore incorrupte, at repudiandae vituperatoribus duo. Et cum commune qualisque, aperiam voluptua voluptatum mei ad. Eripuit explicari laboramus mel no, vix et causae omnesque, nibh tempor perfecto vis at. Ne quis denique copiosae est, sit et volumus abhorreant dissentiet, malorum inermis intellegebat mea an. Tempor iisque sit ne.",
+			0,
+			poststypes.REPLY_SETTING_EVERYONE,
+			nil,
+			nil,
+			nil,
+			nil,
+			author,
+		)
+	}
+
+	return msgs
 }
