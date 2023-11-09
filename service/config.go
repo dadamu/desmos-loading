@@ -15,9 +15,10 @@ const (
 	EnvAccountRecoveryPhrase = "ACCOUNT_RECOVERY_PHRASE"
 	EnvRPCAddress            = "RPC_ADDRESS"
 	EnvGRPCAddress           = "GRPC_ADDRESS"
+	EnvGasPrice              = "GAS_PRICE"
 
 	EnvSubspaceID = "SUBSPACE_ID"
-	EnvSize       = "SIZE"
+	EnvSize       = "MSG_SIZE"
 
 	EnvDuration = "DURATION"
 	EnvRound    = "ROUND"
@@ -64,7 +65,7 @@ func ReadEnvConfig() (*Config, error) {
 			Bech32Prefix:  app.Bech32MainPrefix,
 			RPCAddr:       GetEnvOr(EnvRPCAddress, ""),
 			GRPCAddr:      GetEnvOr(EnvGRPCAddress, ""),
-			GasPrice:      "0.01udaric",
+			GasPrice:      GetEnvOr(EnvGasPrice, "0.02udaric"),
 			GasAdjustment: 2,
 		},
 		SubspaceID: subspaceID,
