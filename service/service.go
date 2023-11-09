@@ -51,7 +51,7 @@ func NewService(cfg *Config) *Service {
 func (s *Service) RunTasks(round int) {
 	fmt.Println(fmt.Sprintf("tester address: %s", s.Wallet.AccAddress()))
 
-	ticker := time.NewTicker(time.Millisecond * 100)
+	ticker := time.NewTicker(time.Millisecond * 500)
 	sequence, err := s.getSequence()
 	if err != nil {
 		panic(err)
@@ -60,7 +60,7 @@ func (s *Service) RunTasks(round int) {
 	msgs := s.generatePostMsgs(s.subspaceID, s.size, s.Wallet.AccAddress())
 	gas := s.getGasLimit(msgs)
 
-	roundPerTick := math.Floor(float64(round) / float64(s.duration.Milliseconds()) * 100)
+	roundPerTick := math.Floor(float64(round) / float64(s.duration.Milliseconds()) * 500)
 	count := 0
 	for range ticker.C {
 		if count >= round {
