@@ -56,9 +56,9 @@ func ReadEnvConfig() (*Config, error) {
 		},
 		Chain: &wallettypes.ChainConfig{
 			Bech32Prefix:  app.Bech32MainPrefix,
-			RPCAddr:       GetEnvOr(EnvRPCAddress, ""),
-			GRPCAddr:      GetEnvOr(EnvGRPCAddress, ""),
-			GasPrice:      GetEnvOr(EnvGasPrice, "0.02udaric"),
+			RPCAddr:       utils.GetEnvOr(EnvRPCAddress, ""),
+			GRPCAddr:      utils.GetEnvOr(EnvGRPCAddress, ""),
+			GasPrice:      utils.GetEnvOr(EnvGasPrice, "0.02udaric"),
 			GasAdjustment: 2,
 		},
 		SubspaceID: subspaceID,
