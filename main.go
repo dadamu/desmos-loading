@@ -45,5 +45,7 @@ func main() {
 	service := service.NewService(cfg)
 	service.RunTasks(round)
 
-	fmt.Println("time used:", time.Now().Sub(startTime))
+	consumed := time.Now().Sub(startTime)
+	fmt.Println("time used:", consumed)
+	fmt.Println("TPS", float64(round)/consumed.Seconds())
 }
